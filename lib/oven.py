@@ -164,11 +164,12 @@ class TempSensorReal(TempSensor):
             log.info("1-wire thermo")
             log.info("on %s",config.gpio_1wire_therm)
             GPIO.setup(config.gpio_1wire_therm, GPIO.IN)
-            self.w1thermosensorCount=0
+            self.w1thermosensorTemps=[];
             for sensor in W1ThermSensor.get_available_sensors():
-                log.info("Sensor %s has temperature %.2f" % (sensor.id, sensor.get_temperature(Unit.DEGREES_F)))
-                self.w1thermosensorCount=self.w1thermosensorCount+1
-            if self.w1thermosensorCount==0:
+                temp = sensor.get_temperature(Unit.DEGREES_F)
+                log.info("Sensor %s has temperature %.2f" % (sensor.id, temp))
+                self.w1thermosensorTemps.append(temp)
+            if len(self.w1thermosensorTemps)==0:
                 log.error("No 1-wire thermo sensors found")
 
     def run(self):
@@ -213,11 +214,14 @@ class TempSensorReal(TempSensor):
 
             if (cycleCounter % config.temperature_average_samples) == 0:
                 thermosensorCount=0
+                prevCount = len(self.w1thermosensorTemps)
                 for sensor in W1ThermSensor.get_available_sensors():
-                    log.info("Sensor %s has temperature %.2f" % (sensor.id, sensor.get_temperature(Unit.DEGREES_F)))
+                    temp = sensor.get_temperature(Unit.DEGREES_F)
+                    log.info("Sensor %s has temperature %.2f" % (sensor.id, temp))
+                    self.w1thermosensorTemps[thermosensorCount] = temp
                     thermosensorCount=thermosensorCount+1
-                if thermosensorCount!=self.w1thermosensorCount:
-                    log.error("Change in 1-wire sensor count, expected=%s actual=%s", self.w1thermosensorCount, thermosensorCount)
+                if thermosensorCount!=prevCount:
+                    log.error("Change in 1-wire sensor count, expected=%s actual=%s", prevCount, thermosensorCount)
 
             sleepRequired = self.sleeptime - (time.time() - cycleStartTime)
             if sleepRequired > 0:
@@ -388,6 +392,7 @@ class Oven(threading.Thread):
             'currency_type': config.currency_type,
             'profile': self.profile.name if self.profile else None,
             'pidstats': self.pid.pidstats,
+            'w1thermosensorTemps': self.board.temp_sensor.w1thermosensorTemps,
         }
         return state
 
