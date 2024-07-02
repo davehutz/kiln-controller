@@ -608,9 +608,6 @@ $(document).ready(function()
                     $('#state').html('<span class="glyphicon glyphicon-time" style="font-size: 22px; font-weight: normal"></span><span style="font-family: Digi; font-size: 40px;">' + eta + '</span>');
                     $('#target_temp').html(parseInt(x.target));
                     $('#cost').html(x.currency_type + parseFloat(x.cost).toFixed(2));
-                  
-
-
                 }
                 else
                 {
@@ -626,6 +623,16 @@ $(document).ready(function()
                 if (x.air > 0.5) { $('#air').addClass("ds-led-air-active"); } else { $('#air').removeClass("ds-led-air-active"); }
                 if (x.temperature > hazardTemp()) { $('#hazard').addClass("ds-led-hazard-active"); } else { $('#hazard').removeClass("ds-led-hazard-active"); }
                 if ((x.door == "OPEN") || (x.door == "UNKNOWN")) { $('#door').addClass("ds-led-door-open"); } else { $('#door').removeClass("ds-led-door-open"); }
+                if (x.w1thermosensorTemps && x.w1thermosensorTemps.length>0)
+                {
+                    $('#relayTempMin').html(parseInt(Math.min(...x.w1thermosensorTemps)));
+                    $('#relayTempMax').html(parseInt(Math.max(...x.w1thermosensorTemps)));
+                }
+                else
+                {
+                    $('#relayTempMin').html("");
+                    $('#relayTempMax').html("");
+                }
 
                 state_last = state;
 
