@@ -6,6 +6,8 @@ import logging
 import json
 import config
 import os
+from w1thermsensor import W1ThermSensor, Unit
+import RPi.GPIO as GPIO
 
 log = logging.getLogger(__name__)
 
@@ -157,11 +159,24 @@ class TempSensorReal(TempSensor):
             log.info("init mcp9600")
             from mcp9600 import OvenMCP9600
             self.thermocouple = OvenMCP9600(units = config.temp_scale)
+        
+        if config.gpio_1wire_therm:
+            log.info("1-wire thermo")
+            log.info("on %s",config.gpio_1wire_therm)
+            GPIO.setup(config.gpio_1wire_therm, GPIO.IN)
+            self.w1thermosensorCount=0
+            for sensor in W1ThermSensor.get_available_sensors():
+                log.info("Sensor %s has temperature %.2f" % (sensor.id, sensor.get_temperature(Unit.DEGREES_F)))
+                self.w1thermosensorCount=self.w1thermosensorCount+1
+            if self.w1thermosensorCount==0:
+                log.error("No 1-wire thermo sensors found")
 
     def run(self):
         '''use a moving average of config.temperature_average_samples across the time_step'''
         temps = []
+        cycleCounter = 0
         while True:
+            cycleCounter = cycleCounter + 1
             # reset error counter if time is up
             if (time.time() - self.bad_stamp) > (self.time_step * 2):
                 if self.bad_count + self.ok_count:
@@ -183,6 +198,7 @@ class TempSensorReal(TempSensor):
                 is_bad_value |= self.shortToGround | self.shortToVCC
 
             if not is_bad_value:
+                log.info("Thermocouple reported %.2f", temp)
                 temps.append(temp)
                 if len(temps) > config.temperature_average_samples:
                     del temps[0]
@@ -194,6 +210,14 @@ class TempSensorReal(TempSensor):
 
             if len(temps):
                 self.temperature = self.get_avg_temp(temps)
+
+            if (cycleCounter % config.temperature_average_samples) == 0:
+                thermosensorCount=0
+                for sensor in W1ThermSensor.get_available_sensors():
+                    log.info("Sensor %s has temperature %.2f" % (sensor.id, sensor.get_temperature(Unit.DEGREES_F)))
+                    thermosensorCount=thermosensorCount+1
+                if thermosensorCount!=self.w1thermosensorCount:
+                    log.error("Change in 1-wire sensor count, expected=%s actual=%s", self.w1thermosensorCount, thermosensorCount)
 
             time.sleep(self.sleeptime)
 
@@ -557,10 +581,6 @@ class RealOven(Oven):
         if heat_on > 0:
             self.heat = heat_on
 
-        if heat_on:
-            self.output.heat(heat_on)
-        if heat_off:
-            self.output.cool(heat_off)
         time_left = self.totaltime - self.runtime
         try:
             log.info("temp=%.2f, target=%.2f, error=%.2f, pid=%.2f, p=%.2f, i=%.2f, d=%.2f, heat_on=%.2f, heat_off=%.2f, run_time=%d, total_time=%d, time_left=%d" %
@@ -578,6 +598,11 @@ class RealOven(Oven):
                 time_left))
         except KeyError:
             pass
+
+        if heat_on:
+            self.output.heat(heat_on)
+        if heat_off:
+            self.output.cool(heat_off)
 
 class Profile():
     def __init__(self, json_data):
