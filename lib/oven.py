@@ -177,6 +177,7 @@ class TempSensorReal(TempSensor):
         cycleCounter = 0
         while True:
             cycleCounter = cycleCounter + 1
+            cycleStartTime = time.time()
             # reset error counter if time is up
             if (time.time() - self.bad_stamp) > (self.time_step * 2):
                 if self.bad_count + self.ok_count:
@@ -198,7 +199,6 @@ class TempSensorReal(TempSensor):
                 is_bad_value |= self.shortToGround | self.shortToVCC
 
             if not is_bad_value:
-                log.info("Thermocouple reported %.2f", temp)
                 temps.append(temp)
                 if len(temps) > config.temperature_average_samples:
                     del temps[0]
@@ -219,7 +219,9 @@ class TempSensorReal(TempSensor):
                 if thermosensorCount!=self.w1thermosensorCount:
                     log.error("Change in 1-wire sensor count, expected=%s actual=%s", self.w1thermosensorCount, thermosensorCount)
 
-            time.sleep(self.sleeptime)
+            sleepRequired = self.sleeptime - (time.time() - cycleStartTime)
+            if sleepRequired > 0:
+                time.sleep(sleepRequired)
 
     def get_avg_temp(self, temps, chop=25):
         '''
