@@ -27,6 +27,7 @@ var ws_storage = new WebSocket(host+"/storage");
 
 if(window.webkitRequestAnimationFrame) window.requestAnimationFrame = window.webkitRequestAnimationFrame;
 
+graph.zoom = false;
 graph.profile =
 {
     label: "Profile",
@@ -325,6 +326,19 @@ function toggleTable()
     }
 }
 
+function updateZoom()
+{
+    if (document.getElementById('chkZoom').checked)
+    {
+        graph.zoom = true;
+    }
+    else
+    {
+        graph.zoom = false;
+    }
+    graph.plot = $.plot("#graph_container", [ graph.profile, graph.live ], getOptions());
+}
+
 function saveProfile()
 {
     name = $('#form_profile_name').val();
@@ -381,7 +395,34 @@ return 3600;
 
 function getOptions()
 {
-
+  var xMin=0, xMax, yMin=0, yMax;
+  if (graph.zoom && graph.live && graph.live.data && graph.live.data.length>0)
+  {
+    var lastTime = graph.live.data[graph.live.data.length-1][0];
+    var lastTemp = graph.live.data[graph.live.data.length-1][1];
+    xMin = lastTime-2700;
+    if (xMin<0)
+    {
+        xMin=0;
+    }
+    xMax = xMin + 3601;
+    yMin = lastTemp-100;
+    yMax = lastTemp+100;
+    for (var i=0;i<graph.live.data.length;i++)
+    {
+        if (graph.live.data[i][0]>=xMin)
+        {
+            if (graph.live.data[i][1]-50<yMin)
+            {
+                yMin = graph.live.data[i][1]-50;
+            }
+            if (graph.live.data[i][1]+50>yMax)
+            {
+                yMax = graph.live.data[i][1]+50;
+            }
+        }
+    }
+  }
   var options =
   {
 
@@ -405,14 +446,16 @@ function getOptions()
 
 	xaxis:
     {
-      min: 0,
+      min: xMin,
+      max: xMax,
       tickColor: 'rgba(216, 211, 197, 0.2)',
       tickFormatter: timeTickFormatter,
       tickSize: get_tick_size(),
       font:
       {
         size: 14,
-        lineHeight: 14,        weight: "normal",
+        lineHeight: 14,       
+        weight: "normal",
         family: "Digi",
         variant: "small-caps",
         color: "rgba(216, 211, 197, 0.85)"
@@ -421,7 +464,8 @@ function getOptions()
 
 	yaxis:
     {
-      min: 0,
+      min:yMin,
+      max:yMax,
       tickDecimals: 0,
       draggable: false,
       tickColor: 'rgba(216, 211, 197, 0.2)',
@@ -552,6 +596,7 @@ $(document).ready(function()
                 {
                     $("#nav_start").hide();
                     $("#nav_stop").show();
+                    $("#div_zoom").css("display", "inline");
 
                     graph.live.data.push([x.runtime, x.temperature]);
                     graph.plot = $.plot("#graph_container", [ graph.profile, graph.live ] , getOptions());
@@ -571,6 +616,7 @@ $(document).ready(function()
                 {
                     $("#nav_start").show();
                     $("#nav_stop").hide();
+                    $("#div_zoom").css("display", "none");
                     $('#state').html('<p class="ds-text">'+state+'</p>');
                 }
 
