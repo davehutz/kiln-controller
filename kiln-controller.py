@@ -12,6 +12,7 @@ import geventwebsocket
 from gevent.pywsgi import WSGIServer
 from geventwebsocket.handler import WebSocketHandler
 from geventwebsocket import WebSocketError
+from RPi import GPIO
 
 try:
     sys.dont_write_bytecode = True
@@ -291,13 +292,18 @@ def get_config():
 
 
 def main():
-    ip = "0.0.0.0"
-    port = config.listening_port
-    log.info("listening on %s:%d" % (ip, port))
+    try:
+        ip = "0.0.0.0"
+        port = config.listening_port
+        log.info("listening on %s:%d" % (ip, port))
 
-    server = WSGIServer((ip, port), app,
+        server = WSGIServer((ip, port), app,
                         handler_class=WebSocketHandler)
-    server.serve_forever()
+        server.serve_forever()
+    except:
+        log.info("exiting")
+    finally:
+        GPIO.cleanup()
 
 
 if __name__ == "__main__":
