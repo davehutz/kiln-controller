@@ -8,6 +8,8 @@ import config
 import os
 from w1thermsensor import W1ThermSensor, Unit
 import RPi.GPIO as GPIO
+from PCF8574 import PCF8574_GPIO
+from Adafruit_LCD1602 import Adafruit_CharLCD
 
 log = logging.getLogger(__name__)
 
@@ -248,6 +250,7 @@ class Oven(threading.Thread):
         self.temperature = 0
         self.time_step = config.sensor_time_wait
         self.reset()
+        self.init_lcd()
 
     def reset(self):
         self.cost = 0
@@ -453,6 +456,37 @@ class Oven(threading.Thread):
         log.info("ovenwatcher set in oven class")
         self.ovenwatcher = watcher
 
+    def init_lcd(self):
+        PCF8574_address = 0x27  # I2C address of the PCF8574 chip.
+        PCF8574A_address = 0x3F  # I2C address of the PCF8574A chip.
+        # Create PCF8574 GPIO adapter.
+        try:
+            mcp = PCF8574_GPIO(PCF8574_address)
+        except:
+            try:
+                mcp = PCF8574_GPIO(PCF8574A_address)
+            except:
+                print ('I2C Address Error !')
+                mcp = None
+        if mcp:
+            # Create LCD, passing in MCP GPIO adapter.
+            self.lcd = Adafruit_CharLCD(pin_rs=0, pin_e=2, pins_db=[4,5,6,7], GPIO=mcp)
+            self.lcd.clear()
+            mcp.output(3,1)     # turn on LCD backlight
+            self.lcd.begin(16,2)     # set number of LCD lines and columns
+            self.lcd.setCursor(0,0)  # set cursor position
+            self.lcd.message("Initialized")
+        else:
+            self.lcd = None
+
+    def update_display(self):
+        if self.lcd:
+            self.lcd.setCursor(0,0)  # set cursor position
+            temp = self.board.temp_sensor.temperature + config.thermocouple_offset
+            self.lcd.message(f'{temp:4.0f}/{self.target:.0f} {(self.totaltime - self.runtime)/60:4.0f}m\n')
+            for sensor in self.board.temp_sensor.w1thermosensorTemps:
+                self.lcd.message(f'{sensor:3.0f} ')
+
     def run(self):
         while True:
             if self.state == "IDLE":
@@ -469,6 +503,7 @@ class Oven(threading.Thread):
                 self.heat_then_cool()
                 self.reset_if_emergency()
                 self.reset_if_schedule_ended()
+                self.update_display()
 
 class SimulatedOven(Oven):
 
