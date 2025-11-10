@@ -57,9 +57,15 @@ function updateProfile(id)
     var job_time = new Date(job_seconds * 1000).toISOString().substr(11, 8);
     $('#sel_prof').html(profiles[id].name);
     $('#sel_prof_eta').html(job_time);
-    $('#sel_prof_cost').html(kwh + ' kWh ('+ currency_type +': '+ cost +')');
+    $('#sel_prof_cost').html(kwh + ' kWh (' + currency_type + ': ' + cost + ')');
+    if (profiles[id].options && profiles[id].options.should_continue_to_final_temp) {
+        $('#form_should_continue_to_final_temp').prop('checked', true);
+    }
+    else {
+        $('#form_should_continue_to_final_temp').prop('checked', false);
+    }
     graph.profile.data = profiles[id].data;
-    graph.plot = $.plot("#graph_container", [ graph.profile, graph.live ] , getOptions());
+    graph.plot = $.plot("#graph_container", [graph.profile, graph.live], getOptions());
 }
 
 function deleteProfile()
@@ -342,6 +348,7 @@ function updateZoom()
 function saveProfile()
 {
     name = $('#form_profile_name').val();
+    should_continue_to_final_temp = $('#form_should_continue_to_final_temp').attr("checked");
     var rawdata = graph.plot.getData()[0].data
     var data = [];
     var last = -1;
@@ -371,7 +378,14 @@ function saveProfile()
         last = rawdata[i][0];
     }
 
-    var profile = { "type": "profile", "data": data, "name": name }
+    var profile = {
+        "type": "profile",
+        "data": data,
+        "name": name,
+        "options": {
+            "should_continue_to_final_temp": should_continue_to_final_temp
+        }
+        }
     var put = { "cmd": "PUT", "profile": profile }
 
     var put_cmd = JSON.stringify(put);
@@ -592,16 +606,23 @@ $(document).ready(function()
                     }
                 }
 
-                if(state=="RUNNING")
-                {
+                if (state == "RUNNING") {
                     $("#nav_start").hide();
                     $("#nav_stop").show();
+                }
+                else {
+                    $("#nav_start").show();
+                    $("#nav_stop").hide();
+                }
+
+                if (state == "RUNNING" || state == "POSTRUN")
+                {
                     $("#div_zoom").css("display", "inline");
 
                     graph.live.data.push([x.runtime, x.temperature]);
                     graph.plot = $.plot("#graph_container", [ graph.profile, graph.live ] , getOptions());
 
-                    left = parseInt(x.totaltime-x.runtime);
+                    left = parseInt(Math.abs(x.totaltime-x.runtime));
                     eta = new Date(left * 1000).toISOString().substr(11, 8);
 
                     updateProgress(parseFloat(x.runtime)/parseFloat(x.totaltime)*100);
@@ -611,14 +632,19 @@ $(document).ready(function()
                 }
                 else
                 {
-                    $("#nav_start").show();
-                    $("#nav_stop").hide();
                     $("#div_zoom").css("display", "none");
                     $('#state').html('<p class="ds-text">'+state+'</p>');
                 }
 
                 $('#act_temp').html(parseInt(x.temperature));
-                $('#heat').html('<div class="bar" style="height:'+x.pidstats.out*70+'%;"></div>')
+                if (x.pidstats)
+                {
+                    $('#heat').html('<div class="bar" style="height:' + x.pidstats.out * 70 + '%;"></div>')
+                }
+                else
+                {
+                    $('#heat').html('<div class="bar" style="height:0%;"></div>')
+                }
                 if (x.cool > 0.5) { $('#cool').addClass("ds-led-cool-active"); } else { $('#cool').removeClass("ds-led-cool-active"); }
                 if (x.air > 0.5) { $('#air').addClass("ds-led-air-active"); } else { $('#air').removeClass("ds-led-air-active"); }
                 if (x.temperature > hazardTemp()) { $('#hazard').addClass("ds-led-hazard-active"); } else { $('#hazard').removeClass("ds-led-hazard-active"); }

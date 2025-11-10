@@ -252,6 +252,9 @@ class Oven(threading.Thread):
         self.reset()
         self.init_lcd()
 
+    def transition_to_postrun(self):
+        self.state = "POSTRUN"
+
     def reset(self):
         self.cost = 0
         self.state = "IDLE"
@@ -308,6 +311,10 @@ class Oven(threading.Thread):
             self.start_time = datetime.datetime.now() - datetime.timedelta(milliseconds = self.runtime * 1000)
             self.update_target_temp()
 
+    def finish_run(self):
+        self.transition_to_postrun()
+        self.save_automatic_restart_state()
+
     def abort_run(self):
         self.reset()
         self.save_automatic_restart_state()
@@ -363,9 +370,12 @@ class Oven(threading.Thread):
 
     def reset_if_schedule_ended(self):
         if self.runtime > self.totaltime:
-            log.info("schedule ended, shutting down")
-            log.info("total cost = %s%.2f" % (config.currency_type,self.cost))
-            self.abort_run()
+            if self.profile.get_should_continue_to_final_temp() and self.temp<self.target:
+                log.info("Not ending because should_continue_to_final_temp and temp < target")
+            else:
+                log.info("schedule ended, shutting down")
+                log.info("total cost = %s%.2f" % (config.currency_type,self.cost))
+                self.finish_run()
 
     def update_cost(self):
         if self.heat:
@@ -492,6 +502,7 @@ class Oven(threading.Thread):
             if self.state == "IDLE":
                 if self.should_i_automatic_restart() == True:
                     self.automatic_restart()
+                self.update_display()
                 time.sleep(1)
                 continue
             if self.state == "RUNNING":
@@ -504,6 +515,15 @@ class Oven(threading.Thread):
                 self.reset_if_emergency()
                 self.reset_if_schedule_ended()
                 self.update_display()
+                continue
+            if self.state == "POSTRUN":
+                self.update_runtime()
+                temp = self.board.temp_sensor.temperature + config.thermocouple_offset
+                self.target = temp
+                self.heat = 0.0
+                self.update_display()
+                time.sleep(self.time_step)
+                continue
 
 class SimulatedOven(Oven):
 
@@ -607,6 +627,10 @@ class RealOven(Oven):
         # start thread
         self.start()
 
+    def transition_to_postrun(self):
+        super().transition_to_postrun()
+        self.output.cool(0)
+
     def reset(self):
         super().reset()
         self.output.cool(0)
@@ -651,6 +675,7 @@ class Profile():
         obj = json.loads(json_data)
         self.name = obj["name"]
         self.data = sorted(obj["data"])
+        self.options = obj["options"]
 
     def get_duration(self):
         return max([t for (t, x) in self.data])
@@ -672,13 +697,19 @@ class Profile():
 
     def get_target_temperature(self, time):
         if time > self.get_duration():
-            return 0
+            return self.data[len(self.data)-1][1]
 
         (prev_point, next_point) = self.get_surrounding_points(time)
 
         incl = float(next_point[1] - prev_point[1]) / float(next_point[0] - prev_point[0])
         temp = prev_point[1] + (time - prev_point[0]) * incl
         return temp
+
+    def get_should_continue_to_final_temp(self):
+        if self.options and self.options.continue_to_final_temp:
+            return True
+        else:
+            return False
 
 
 class PID():
