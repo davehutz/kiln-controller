@@ -97,15 +97,10 @@ sensor_time_wait = 15
 pid_kp = 17
 pid_ki = 6
 pid_kd = 800 # was 486
+# Setting to cap the (absolute value of) the value of the integral to avoid 
+# massive overshoots if it can't keep up with the ramp rate.
+pid_max_i = 200 
 kw_elements     = 9 # if the kiln elements are on, the wattage in kilowatts
-
-########################################################################
-#
-# Initial heating and Integral Windup
-#
-# this setting is deprecated and is no longer used. this happens by
-# default and is the expected behavior.
-stop_integral_windup = True
 
 ########################################################################
 #

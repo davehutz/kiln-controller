@@ -197,22 +197,13 @@ function hazardTemp(){
 
 function timeTickFormatter(val,axis)
 {
-// hours
-if(axis.max>3600) {
-  //var hours = Math.floor(val / (3600));
-  //return hours;
-  return Math.floor(val/3600);
-  }
+    if (Math.floor(val/60)==Math.ceil(val/60))
+    {
+        // even number of minutes
+        return Math.floor(val/3600) + ":" + Math.floor((val % 3600)/60).toString().padStart(2, '0');;
+    }
 
-// minutes
-if(axis.max<=3600) {
-  return Math.floor(val/60);
-  }
-
-// seconds
-if(axis.max<=60) {
-  return val;
-  }
+    return val;
 }
 
 function runTask()
@@ -348,7 +339,7 @@ function updateZoom()
 function saveProfile()
 {
     name = $('#form_profile_name').val();
-    should_continue_to_final_temp = $('#form_should_continue_to_final_temp').attr("checked");
+    should_continue_to_final_temp = $('#form_should_continue_to_final_temp').prop("checked");
     var rawdata = graph.plot.getData()[0].data
     var data = [];
     var last = -1;
@@ -395,16 +386,16 @@ function saveProfile()
     leaveEditMode();
 }
 
-function get_tick_size() {
-//switch(time_scale_profile){
-//  case "s":
-//    return 1;
-//  case "m":
-//    return 60;
-//  case "h":
-//    return 3600;
-//  }
-return 3600;
+function get_tick_size()
+{
+    if (graph.zoom)
+    {
+        return 900;
+    }
+    else
+    {
+        return 3600;
+    }
 }
 
 function getOptions()

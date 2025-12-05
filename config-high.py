@@ -100,14 +100,6 @@ kw_elements     = 9 # if the kiln elements are on, the wattage in kilowatts
 
 ########################################################################
 #
-# Initial heating and Integral Windup
-#
-# this setting is deprecated and is no longer used. this happens by
-# default and is the expected behavior.
-stop_integral_windup = True
-
-########################################################################
-#
 #   Simulation parameters
 simulate = False
 sim_t_env      = 60.0   # deg C

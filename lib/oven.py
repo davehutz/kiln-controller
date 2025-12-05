@@ -6,6 +6,7 @@ import logging
 import json
 import config
 import os
+import math
 from w1thermsensor import W1ThermSensor, Unit
 import RPi.GPIO as GPIO
 from PCF8574 import PCF8574_GPIO
@@ -370,7 +371,7 @@ class Oven(threading.Thread):
 
     def reset_if_schedule_ended(self):
         if self.runtime > self.totaltime:
-            if self.profile.get_should_continue_to_final_temp() and self.temp<self.target:
+            if self.profile.get_should_continue_to_final_temp() and (self.board.temp_sensor.temperature + config.thermocouple_offset)<self.target:
                 log.info("Not ending because should_continue_to_final_temp and temp < target")
             else:
                 log.info("schedule ended, shutting down")
@@ -706,7 +707,7 @@ class Profile():
         return temp
 
     def get_should_continue_to_final_temp(self):
-        if self.options and self.options.continue_to_final_temp:
+        if self.options and self.options["should_continue_to_final_temp"]:
             return True
         else:
             return False
@@ -755,6 +756,11 @@ class PID():
         else:
             icomp = (error * timeDelta * (1/self.ki))
             self.iterm += (error * timeDelta * (1/self.ki))
+            # avoid overshoot by capping cumulative i value
+            # For me, bad things happen if the ramp rate is higher than the kiln can manage.
+            if config.pid_max_i and abs(self.iterm)>config.pid_max_i:
+              log.info("i term over configured limit; setting to limit")
+              self.iterm = math.copysign(config.pid_max_i, self.iterm)
             dErr = (error - self.lastErr) / timeDelta
             output = self.kp * error + self.iterm + self.kd * dErr
             output = sorted([-1 * window_size, output, window_size])[1]
