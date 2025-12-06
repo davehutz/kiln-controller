@@ -631,6 +631,8 @@ class RealOven(Oven):
     def transition_to_postrun(self):
         super().transition_to_postrun()
         self.output.cool(0)
+        self.pid.pidstats["out"]=0 # Used for display
+
 
     def reset(self):
         super().reset()
@@ -676,7 +678,7 @@ class Profile():
         obj = json.loads(json_data)
         self.name = obj["name"]
         self.data = sorted(obj["data"])
-        self.options = obj["options"]
+        self.options = obj.get("options")
 
     def get_duration(self):
         return max([t for (t, x) in self.data])
